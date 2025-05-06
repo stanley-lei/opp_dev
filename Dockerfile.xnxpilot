@@ -1,0 +1,195 @@
+# syntax=docker/dockerfile:1.4
+#FROM --platform=linux/arm64 nvidia/cuda:11.4.3-cudnn8-devel-ubuntu20.04
+FROM --platform=linux/arm64 ubuntu:20.04
+ENV DEBIAN_FRONTEND=noninteractive
+
+ARG USER_ID=1000
+ARG GROUP_ID=1000
+ARG USERNAME=dockeruser
+
+# Set timezone
+ENV TZ=UTC
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+# 1) # Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    curl \
+    git \
+    libffi-dev \
+    libssl-dev \
+    pkg-config \
+    wget \
+    software-properties-common \
+    zlib1g-dev \
+    libbz2-dev \
+    libreadline-dev \
+    libsqlite3-dev \
+    libncurses5-dev \
+    libncursesw5-dev \
+    xz-utils \
+    tk-dev \
+    liblzma-dev \
+    libgdbm-dev \
+    libnss3-dev \
+    libc6-dev \
+    sudo \
+    vim \
+    autoconf \
+    ca-certificates \
+    casync \
+    clang \
+    make \
+    cppcheck \
+    libtool \
+    gcc-arm-none-eabi \
+    bzip2 \
+    capnproto \
+    libcapnp-dev \
+    libcurl4-openssl-dev \
+    git \
+    git-lfs \
+    ffmpeg \
+    libavformat-dev \
+    libavcodec-dev \
+    libavdevice-dev \
+    libavutil-dev \
+    libavfilter-dev \
+    libeigen3-dev \
+    libglew-dev \
+    libgles2-mesa-dev \
+    libglfw3-dev \
+    libglib2.0-0 \
+    libomp-dev \
+    libopencv-dev \
+    libpng16-16 \
+    libssl-dev \
+    libusb-1.0-0-dev \
+    libzmq3-dev \
+    libsystemd-dev \
+    locales \
+    opencl-headers \
+    ocl-icd-libopencl1 \
+    ocl-icd-opencl-dev \
+    clinfo \
+    qml-module-qtquick2 \
+    qtmultimedia5-dev \
+    qtlocation5-dev \
+    qtpositioning5-dev \
+    qttools5-dev-tools \
+    libqt5sql5-sqlite \
+    libqt5svg5-dev \
+    libqt5x11extras5-dev \
+    libdw1 \
+    valgrind \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python 3.8
+RUN apt-get update && apt-get install -y \
+    python3.8 \
+    python3.8-dev \
+    python3.8-venv \
+    python3-pip \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/python3.8 /usr/bin/python3 \
+    && ln -sf /usr/bin/python3.8 /usr/bin/python
+
+# 2) Ensure `python` → `python3.8` and `pip` → `pip3`
+# RUN apt-get update && \
+#     apt-get install -y python-is-python3 && \
+#     ln -sf /usr/bin/pip3 /usr/bin/pip && \
+#     pip install --no-cache-dir --upgrade pip setuptools wheel && \
+#     rm -rf /var/lib/apt/lists/*
+
+# 3) Create a 'nvidia' user (for container builds) and a 'docker' user matching host
+# Handle existing user with same UID if exists
+RUN set -e; \
+    # Check if a user with USER_ID exists
+    if getent passwd ${USER_ID} > /dev/null; then \
+        existing_username=$(getent passwd ${USER_ID} | cut -d: -f1); \
+        # Only delete if username is not empty
+        if [ -n "${existing_username}" ]; then \
+            userdel -f "${existing_username}"; \
+        fi; \
+    fi
+
+# RUN if [ -f /etc/apt/sources.list.d/cuda.list ]; then \
+#     sed -i 's/^deb/#deb/g' /etc/apt/sources.list.d/cuda.list; \
+# fi && \
+# if [ -f /etc/apt/sources.list.d/nvidia-ml.list ]; then \
+#     sed -i 's/^deb/#deb/g' /etc/apt/sources.list.d/nvidia-ml.list; \
+# fi
+# 
+# # 安装 sudo
+# RUN apt-get update && apt-get install -y sudo
+
+# Handle existing group with same GID if exists
+RUN if getent group ${GROUP_ID} > /dev/null; then \
+        existing_groupname=$(getent group ${GROUP_ID} | cut -d: -f1); \
+        groupdel ${existing_groupname}; \
+    fi
+
+# Create group with the specified GID
+RUN groupadd -g ${GROUP_ID} ${USERNAME}
+
+# Create user with the specified UID and GID
+RUN useradd -u ${USER_ID} -g ${GROUP_ID} -m -s /bin/bash ${USERNAME} && \
+    usermod -aG sudo ${USERNAME} && \
+    echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/${USERNAME}
+
+# Set up the workspace directory
+WORKDIR /home/${USERNAME}/workspace/xnxpilot
+
+# Install pyenv for Python version management
+RUN apt-get update && apt-get install -y \
+    libffi-dev \
+    libssl-dev \
+    zlib1g-dev \
+    libbz2-dev \
+    libreadline-dev \
+    libsqlite3-dev \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install pyenv for both root and the user
+RUN curl -L https://github.com/pyenv/pyenv-installer/raw/master/bin/pyenv-installer | bash && \
+    echo 'export PYENV_ROOT="$HOME/.pyenv"' >> /root/.bashrc && \
+    echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> /root/.bashrc && \
+    echo 'eval "$(pyenv init --path)"' >> /root/.bashrc && \
+    echo 'eval "$(pyenv init -)"' >> /root/.bashrc && \
+    echo 'eval "$(pyenv virtualenv-init -)"' >> /root/.bashrc && \
+    chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}
+
+USER ${USERNAME}
+RUN curl -L https://github.com/pyenv/pyenv-installer/raw/master/bin/pyenv-installer | bash && \
+    echo 'export PYENV_ROOT="$HOME/.pyenv"' >> /home/${USERNAME}/.bashrc && \
+    echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> /home/${USERNAME}/.bashrc && \
+    echo 'eval "$(pyenv init --path)"' >> /home/${USERNAME}/.bashrc && \
+    echo 'eval "$(pyenv init -)"' >> /home/${USERNAME}/.bashrc && \
+    echo 'eval "$(pyenv virtualenv-init -)"' >> /home/${USERNAME}/.bashrc
+
+# Ensure directory exists and set permissions
+RUN mkdir -p /home/${USERNAME}/workspace/xnxpilot && \
+    chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}
+
+# Default to the user
+USER ${USERNAME}
+
+# （可选）如需恢复 NVIDIA 源，取消注释
+# RUN if [ -f /etc/apt/sources.list.d/cuda.list ]; then \
+#         sed -i 's/^#deb/deb/g' /etc/apt/sources.list.d/cuda.list; \
+#     fi && \
+#     if [ -f /etc/apt/sources.list.d/nvidia-ml.list ]; then \
+#         sed -i 's/^#deb/deb/g' /etc/apt/sources.list.d/nvidia-ml.list; \
+#     fi
+
+# 5) Default entrypoint
+CMD ["bash"]
+
+ENV USER_ID=${USER_ID}
+ENV GROUP_ID=${GROUP_ID}
+ENV USERNAME=${USERNAME}

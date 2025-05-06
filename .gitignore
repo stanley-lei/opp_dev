@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+.Python
+venv/
+ENV/
+
+# Database
+*.db
+*.sqlite3
+
+# Logs
+*.log
+
+# Environment variables
+.env
+
+# IDE specific
+.vscode/
+.idea/
+
+# Build and distribution
+build/
+dist/
+*.egg-info/
+
+# Test artifacts
+.coverage
+htmlcov/
+
+# Local data storage
+data/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Simulation files
+simulations/
+
+# Local configuration
+local_config.yaml
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+
+*.db
+*.sqlite3
