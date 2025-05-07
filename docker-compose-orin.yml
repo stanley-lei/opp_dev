@@ -6,22 +6,19 @@ services:
       args:
         USER_ID: ${HOST_UID:-1000}
         GROUP_ID: ${HOST_GID:-1000}
-        USERNAME: ${USER:-developer}
     platform: linux/arm64  # Explicitly use Arm64 architecture
     privileged: true  # Add privileged mode
     volumes:
-      - .:/home/${USER:-developer}/workspace/orin
+      - .:/home/nvidia/workspace
       # Don't mount host passwd and group files as read-only
       # as they can cause issues with user/group identification
     ports:
       - "12000:8000"  # Adjust as needed for your application
     environment:
-      - PYTHONPATH=/home/${USER:-developer}/workspace/orin
-      - USER=${USER:-developer}
-      - HOME=/home/${USER:-developer}
+      - HOME=/home/nvidia
     # Don't set the user explicitly, let the container use the user created in Dockerfile
     # user: "${UID:-1000}:${GID:-1000}"
-    working_dir: /home/${USER:-developer}/workspace/orin
+    working_dir: /home/nvidia/workspace
     tty: true
     stdin_open: true
 

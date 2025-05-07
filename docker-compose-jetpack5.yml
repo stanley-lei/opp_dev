@@ -1,0 +1,27 @@
+services:
+  jetpack:
+    build:
+      context: .
+      dockerfile: Dockerfile.jetpack_5
+      args:
+        USER_ID: ${HOST_UID:-1000}
+        GROUP_ID: ${HOST_GID:-1000}
+    privileged: true  # Add privileged mode
+    runtime: nvidia   # Add Nvidia runtme
+    volumes:
+      - .:/home/nvidia/workspace
+      - /tmp/.X11-unix/:/tmp/.X11-unix    # Mount X11 sockets
+      # Don't mount host passwd and group files as read-only
+      # as they can cause issues with user/group identification
+    ports:
+      - "18000:8000"  # Adjust as needed for your application
+    environment:
+      - PYTHONPATH=/home/nvidia/workspace
+      - HOME=/home/nvidia
+      - DISPLAY=${DISPLAY}               # Pass DISPLAY environment variable
+    # Don't set the user explicitly, let the container use the user created in Dockerfile
+    # user: "${UID:-1000}:${GID:-1000}"
+    working_dir: /home/nvidia/workspace
+    tty: true
+    stdin_open: true
+

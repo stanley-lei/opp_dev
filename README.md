@@ -1,5 +1,12 @@
-# opp_dev
-development env for openpilot
+# Development Env
+`openpilot` and `xnxpilot` can be built in Orin device directly, but it means Orin needs to be setup correctly to access internet to download necessary packages during building phase. To help developer work on the environment, the docker based environment is used.
+
+## Docker Image Source
+There are two base images used for Docker:
+
+1. Standard ARM64 Ubuntu Image
+2. Nvidia JetPacket Image
+
 
 # Prerequisite
 ## Install Docker
@@ -58,7 +65,7 @@ patch -p1 < ../SConstruct.patch
 # Setup Build Environment
 
 ## Build xnxpilot 
-### Build Docker for xnxpilot
+### Build Docker for xnxpilot (JetPack base)
 
 ```
 ./build_xnxpilot_docker.sh
@@ -72,27 +79,47 @@ docker compose exec xnxpilot bash
 cd xnxpilot
 ./tools/openpilot_env.sh
 python -m venv venv
+pip install --upgrade pip setuptools wheel
 pip install -r ../requirements.txt
+pip install ../onnxruntime_gpu-1.8.0-cp38-cp38-linux_aarch64.whl
 scons -j$(nproc)
 ```
 
-## Build xnxpilot
+## Build openpilot
 
-### Build Docker for openpilot
+### Build Docker for openpilot (ARM64 Ubuntu Base)
+
 ```
 ./build_xnxpilot_docker.sh
 
 ```
 ### Build openpilot in Docker
 
+This Docker already has preinstalled system dependencies installed which
+are defined in Dockerfile. So it only needs to install the dependent python packages.
+
 ```
 docker compose exec orin bash
 cd openpilot
-./tools/openpilot_env.sh
 python -m venv venv
-pip install -r ../requirements.txt
+pip install --upgrade pip setuptools wheel
+pip install ../onnxruntime_gpu-1.8.0-cp38-cp38-linux_aarch64.whl
 scons -j$(nproc)
 ```
 
+## Notes
 
+### Solution to build substitue for pyopencl
 
+```
+cd ~/workspace
+git clone --single-branch --branch ${POCL_VERSION} https://github.com/pocl/pocl.git
+cd ${WORKSPACE}/pocl
+mkdir build
+cd build
+cmake -DCMAKE_BUILD_TYPE=Release -DWITH_LLVM_CONFIG=/usr/lib/${LLVM_INSTALL_FOLDER}/bin/llvm-config -DENABLE_CUDA=ON -DSTATIC_LLVM=ON ..
+make -j $(nproc)
+sudo make install
+mkdir -p /etc/OpenCL/vendors/
+echo "/usr/local/lib/libpocl.so" > /etc/OpenCL/vendors/pocl.icd
+```

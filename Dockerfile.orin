@@ -1,11 +1,13 @@
 # syntax=docker/dockerfile:1.4
 #FROM --platform=linux/arm64 nvidia/cuda:11.4.3-cudnn8-devel-ubuntu20.04
 FROM --platform=linux/arm64 ubuntu:20.04
+#ARG TAG=r35.3.1
+#FROM nvcr.io/nvidia/l4t-jetpack:${TAG}
 ENV DEBIAN_FRONTEND=noninteractive
 
 ARG USER_ID=1000
 ARG GROUP_ID=1000
-ARG USERNAME=dockeruser
+ARG USERNAME=nvidia
 
 # Set timezone
 ENV TZ=UTC
@@ -116,16 +118,6 @@ RUN set -e; \
         fi; \
     fi
 
-# RUN if [ -f /etc/apt/sources.list.d/cuda.list ]; then \
-#     sed -i 's/^deb/#deb/g' /etc/apt/sources.list.d/cuda.list; \
-# fi && \
-# if [ -f /etc/apt/sources.list.d/nvidia-ml.list ]; then \
-#     sed -i 's/^deb/#deb/g' /etc/apt/sources.list.d/nvidia-ml.list; \
-# fi
-# 
-# # 安装 sudo
-# RUN apt-get update && apt-get install -y sudo
-
 # Handle existing group with same GID if exists
 RUN if getent group ${GROUP_ID} > /dev/null; then \
         existing_groupname=$(getent group ${GROUP_ID} | cut -d: -f1); \
@@ -141,7 +133,7 @@ RUN useradd -u ${USER_ID} -g ${GROUP_ID} -m -s /bin/bash ${USERNAME} && \
     echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/${USERNAME}
 
 # Set up the workspace directory
-WORKDIR /home/${USERNAME}/workspace/orin
+WORKDIR /home/${USERNAME}/workspace
 
 # Install pyenv for Python version management
 RUN apt-get update && apt-get install -y \
@@ -173,23 +165,10 @@ RUN curl -L https://github.com/pyenv/pyenv-installer/raw/master/bin/pyenv-instal
     echo 'eval "$(pyenv virtualenv-init -)"' >> /home/${USERNAME}/.bashrc
 
 # Ensure directory exists and set permissions
-RUN mkdir -p /home/${USERNAME}/workspace/orin && \
+RUN mkdir -p /home/${USERNAME}/workspace && \
     chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}
 
 # Default to the user
 USER ${USERNAME}
 
-# （可选）如需恢复 NVIDIA 源，取消注释
-# RUN if [ -f /etc/apt/sources.list.d/cuda.list ]; then \
-#         sed -i 's/^#deb/deb/g' /etc/apt/sources.list.d/cuda.list; \
-#     fi && \
-#     if [ -f /etc/apt/sources.list.d/nvidia-ml.list ]; then \
-#         sed -i 's/^#deb/deb/g' /etc/apt/sources.list.d/nvidia-ml.list; \
-#     fi
-
-# 5) Default entrypoint
 CMD ["bash"]
-
-ENV USER_ID=${USER_ID}
-ENV GROUP_ID=${GROUP_ID}
-ENV USERNAME=${USERNAME}

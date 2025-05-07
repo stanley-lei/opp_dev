@@ -3,7 +3,7 @@ azure-storage-blob>=2.1
 control
 coverage
 dictdiffer
-fastcluster
+fastcluster==1.2.6
 hexdump
 hypothesis==6.46.7
 inputs
@@ -52,7 +52,6 @@ Jinja2
 json-rpc
 libusb1
 nose
-numpy
 protobuf==3.20.2
 onnx
 #onnxruntime-gpu = {version = "*", markers="platform_system != 'Darwin'"}

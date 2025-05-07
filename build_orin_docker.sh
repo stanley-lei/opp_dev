@@ -9,6 +9,7 @@ echo "Using HOST_UID=$HOST_UID and HOST_GID=$HOST_GID"
 
 # Run docker compose with the current user's UID and GID
 docker compose -f docker-compose-orin.yml down && docker compose -f docker-compose-orin.yml up -d --build
+#  --remove-orphans
 
 # Provide instructions for connecting to the container
 echo "Development environment is ready!"
