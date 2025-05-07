@@ -30,15 +30,6 @@ ARG USERNAME=nvidia
 ENV TZ=UTC
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-#
-# Install any utils needed for execution
-#
-RUN apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends sudo vim && \
-    rm -rf /var/lib/apt/lists/*
-
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
@@ -125,10 +116,26 @@ RUN apt-get update && apt-get install -y \
     && ln -sf /usr/bin/python3.8 /usr/bin/python3 \
     && ln -sf /usr/bin/python3.8 /usr/bin/python
 
+# Ensure `python` → `python3.8` and `pip` → `pip3`
+RUN apt-get update && \
+    apt-get install -y python-is-python3 && \
+    ln -sf /usr/bin/pip3 /usr/bin/pip && \
+    pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install any utils needed for execution
+
+RUN apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends sudo vim && \
+    rm -rf /var/lib/apt/lists/*
+
+
+#
 # Install nvidia-cuda-dev for CUDA developer packages
 # Use nvidia-cuda if need CUDA runtime only
-
-
+#
 RUN apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     apt-get -o Acquire::CompressionTypes::Order::=gz update && \

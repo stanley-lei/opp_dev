@@ -2,7 +2,7 @@
 
 xhost +
 
-sudo docker run -it --name jet-dev \
+sudo docker run -it --name cudo_env \
   --privileged \
   --runtime=nvidia \
   --network=host \
@@ -13,5 +13,5 @@ sudo docker run -it --name jet-dev \
   -e HOME=/home/nvidia \
   -e DISPLAY=$DISPLAY \
   -w /home/nvidia/workspace \
-  jetpack5-image
+  cudo_env
 
