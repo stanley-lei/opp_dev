@@ -90,7 +90,7 @@ scons -j$(nproc)
 ### Build Docker for openpilot (ARM64 Ubuntu Base)
 
 ```
-./build_xnxpilot_docker.sh
+./build_orin_docker.sh
 
 ```
 ### Build openpilot in Docker
@@ -104,6 +104,31 @@ cd openpilot
 python -m venv venv
 pip install --upgrade pip setuptools wheel
 pip install ../onnxruntime_gpu-1.8.0-cp38-cp38-linux_aarch64.whl
+export PYTHONPATH=/home/nvidia/workspace/openpilot:$PYTHONPATH
+scons -j$(nproc)
+```
+
+## Build openpilot onboard  (Inside orin)
+
+### Build Docker for openpilot (ARM64 Ubuntu Base)
+
+```
+./simple_build_docker.sh
+./launch_docker.sh
+
+```
+### Build openpilot in Docker
+
+This Docker already has preinstalled system dependencies installed which
+are defined in Dockerfile. So it only needs to install the dependent python packages.
+
+```
+docker compose exec orin bash
+cd openpilot
+python -m venv venv
+pip install --upgrade pip setuptools wheel
+pip install ../onnxruntime_gpu-1.8.0-cp38-cp38-linux_aarch64.whl
+export PYTHONPATH=/home/nvidia/workspace/openpilot:$PYTHONPATH
 scons -j$(nproc)
 ```
 
