@@ -1,0 +1,33 @@
+diff --git a/messaging/__init__.py b/messaging/__init__.py
+index c695769..7c3cb69 100644
+--- a/messaging/__init__.py
++++ b/messaging/__init__.py
+@@ -3,6 +3,7 @@ from .messaging_pyx import Context, Poller, SubSocket, PubSocket  # pylint: disa
+ from .messaging_pyx import MultiplePublishersError, MessagingError  # pylint: disable=no-name-in-module, import-error
+ import os
+ import capnp
++import contextlib
+ 
+ from typing import Optional, List, Union
+ from collections import deque
+@@ -28,7 +29,19 @@ except ImportError:
+ context = Context()
+ 
+ def log_from_bytes(dat: bytes) -> capnp.lib.capnp._DynamicStructReader:
+-  return log.Event.from_bytes(dat, traversal_limit_in_words=NO_TRAVERSAL_LIMIT)
++  # Start by getting the event object from capnp
++  event = log.Event.from_bytes(dat, traversal_limit_in_words=NO_TRAVERSAL_LIMIT)
++
++  # Check if it's a context manager
++  if isinstance(event, contextlib._GeneratorContextManager):
++    # Handle it properly by using 'with' and returning the inner value
++    # This avoids leaking the context manager into the messaging system
++    print("CONTEXT MANAGER CONVERTION HAPPNED")
++    with event as unpacked_event:
++      return unpacked_event
++  else:
++    # If it's already a proper object, just return it
++    return event
+ 
+ def new_message(service: Optional[str] = None, size: Optional[int] = None) -> capnp.lib.capnp._DynamicStructBuilder:
+   dat = log.Event.new_message()

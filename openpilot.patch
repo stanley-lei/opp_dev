@@ -1,0 +1,293 @@
+diff --git a/SConstruct b/SConstruct
+index 49685b19b..952503db6 100644
+--- a/SConstruct
++++ b/SConstruct
+@@ -8,6 +8,8 @@ import numpy as np
+ TICI = os.path.isfile('/TICI')
+ AGNOS = TICI
+ 
++ORIN = True
++
+ Decider('MD5-timestamp')
+ 
+ AddOption('--test',
+@@ -54,22 +56,30 @@ AddOption('--no-thneed',
+           help='avoid using thneed')
+ 
+ real_arch = arch = subprocess.check_output(["uname", "-m"], encoding='utf8').rstrip()
++acados_arch = arch
++
+ if platform.system() == "Darwin":
+   arch = "Darwin"
++  acados_arch = arch
+ 
+ if arch == "aarch64" and AGNOS:
+   arch = "larch64"
++  acados_arch = arch
++
++if arch == "aarch64" and ORIN:
++   arch = "oarch64"
++   acados_arch = "larch64"
+ 
+ USE_WEBCAM = os.getenv("USE_WEBCAM") is not None
+ 
+ lenv = {
+   "PATH": os.environ['PATH'],
+-  "LD_LIBRARY_PATH": [Dir(f"#third_party/acados/{arch}/lib").abspath],
++  "LD_LIBRARY_PATH": [Dir(f"#third_party/acados/{acados_arch}/lib").abspath],
+   "PYTHONPATH": Dir("#").abspath + ":" + Dir("#pyextra/").abspath,
+ 
+   "ACADOS_SOURCE_DIR": Dir("#third_party/acados/include/acados").abspath,
+   "ACADOS_PYTHON_INTERFACE_PATH": Dir("#pyextra/acados_template").abspath,
+-  "TERA_PATH": Dir("#").abspath + f"/third_party/acados/{arch}/t_renderer",
++  "TERA_PATH": Dir("#").abspath + f"/third_party/acados/{acados_arch}/t_renderer",
+ }
+ 
+ rpath = lenv["LD_LIBRARY_PATH"].copy()
+@@ -85,7 +95,7 @@ if arch == "larch64":
+     "/usr/local/lib",
+     "/usr/lib",
+     "/system/vendor/lib64",
+-    f"#third_party/acados/{arch}/lib",
++    f"#third_party/acados/{acados_arch}/lib",
+   ]
+ 
+   libpath += [
+@@ -99,6 +109,37 @@ if arch == "larch64":
+   cflags = ["-DQCOM2", "-mcpu=cortex-a57"]
+   cxxflags = ["-DQCOM2", "-mcpu=cortex-a57"]
+   rpath += ["/usr/local/lib"]
++elif arch == "oarch64":
++  cpppath = [
++    "#third_party/opencl/include",
++  ]
++
++  libpath = [
++    "/usr/lib",
++    "/usr/local/lib",
++    "/usr/local/cuda/targets/aarch64-linux/lib",
++    "/usr/local/cuda/lib64",
++    "/usr/lib/aarch64-linux-gnu",
++  ]
++
++  libpath += [
++    f"#third_party/acados/{acados_arch}/lib",
++    "#third_party/snpe/larch64",
++    "#third_party/libyuv/larch64/lib",
++  ]
++
++  cpppath += [
++  ]
++
++  cflags = ["-march=armv8.2-a"]
++  cxxflags = ["-march=armv8.2-a"]
++  rpath += [
++    "/usr/lib",
++    "/usr/local/lib",
++    "/usr/local/cuda/targets/aarch64-linux/lib",
++    "/usr/local/cuda/lib64",
++    "/usr/lib/aarch64-linux-gnu",
++]
+ else:
+   cflags = []
+   cxxflags = []
+@@ -296,12 +337,12 @@ else:
+   qt_dirs += [f"/usr/include/{real_arch}-linux-gnu/qt5/Qt{m}" for m in qt_modules]
+ 
+   qt_libs = [f"Qt5{m}" for m in qt_modules]
+-  if arch == "larch64":
++  if arch in ["larch64", "oarch64"]:
+     qt_libs += ["GLESv2", "wayland-client"]
+   elif arch != "Darwin":
+     qt_libs += ["GL"]
+ 
+-qt_env.Tool('qt')
++qt_env.Tool('qt3')
+ qt_env['CPPPATH'] += qt_dirs + ["#selfdrive/ui/qt/"]
+ qt_flags = [
+   "-D_REENTRANT",
+diff --git a/cereal b/cereal
+--- a/cereal
++++ b/cereal
+@@ -1 +1 @@
+-Subproject commit 589ef049a7b0bac31f4c8987c0fc539839fae489
++Subproject commit 589ef049a7b0bac31f4c8987c0fc539839fae489-dirty
+diff --git a/launch_env.sh b/launch_env.sh
+index ac84d6dcb..46ca1cdd8 100755
+--- a/launch_env.sh
++++ b/launch_env.sh
+@@ -1,5 +1,6 @@
+ #!/usr/bin/bash
+ 
++export ZMQ=1
+ export OMP_NUM_THREADS=1
+ export MKL_NUM_THREADS=1
+ export NUMEXPR_NUM_THREADS=1
+@@ -14,4 +15,6 @@ if [ -z "$PASSIVE" ]; then
+   export PASSIVE="1"
+ fi
+ 
+-export STAGING_ROOT="/data/safe_staging"
++#export STAGING_ROOT="/data/safe_staging"
++export STAGING_ROOT="/home/nvidia/workspace/safe_staging"
++export PYTHONPATH=`pwd`:$PYTHONPATH
+diff --git a/selfdrive/boardd/SConscript b/selfdrive/boardd/SConscript
+index 922107509..02c86b00d 100644
+--- a/selfdrive/boardd/SConscript
++++ b/selfdrive/boardd/SConscript
+@@ -2,8 +2,10 @@ Import('env', 'envCython', 'common', 'cereal', 'messaging')
+ 
+ libs = ['usb-1.0', common, cereal, messaging, 'pthread', 'zmq', 'capnp', 'kj']
+ env.Program('boardd', ['main.cc', 'boardd.cc', 'panda.cc', 'pigeon.cc'], LIBS=libs)
+-env.Library('libcan_list_to_can_capnp', ['can_list_to_can_capnp.cc'])
++#env.Library('libcan_list_to_can_capnp', ['can_list_to_can_capnp.cc'])
+ 
+-envCython.Program('boardd_api_impl.so', 'boardd_api_impl.pyx', LIBS=["can_list_to_can_capnp", 'capnp', 'kj'] + envCython["LIBS"])
++envCython.Append(CXXFLAGS=["-D_GLIBCXX_USE_CXX11_ABI=1"])
++
++envCython.Program('boardd_api_impl.so', ['boardd_api_impl.pyx', 'can_list_to_can_capnp.cc'], LIBS=['capnp', 'kj'] + envCython["LIBS"])
+ if GetOption('test'):
+   env.Program('tests/test_boardd_usbprotocol', ['tests/test_boardd_usbprotocol.cc', 'panda.cc'], LIBS=libs)
+diff --git a/selfdrive/boardd/boardd_api_impl.pyx b/selfdrive/boardd/boardd_api_impl.pyx
+index 0d428a925..445f5b40f 100644
+--- a/selfdrive/boardd/boardd_api_impl.pyx
++++ b/selfdrive/boardd/boardd_api_impl.pyx
+@@ -4,11 +4,13 @@ from libcpp.vector cimport vector
+ from libcpp.string cimport string
+ from libcpp cimport bool
+ 
+-cdef struct can_frame:
+-  long address
+-  string dat
+-  long busTime
+-  long src
++# Include the panda.h header to use its can_frame struct
++cdef extern from "panda.h":
++    cdef struct can_frame:
++      long address
++      string dat
++      long busTime
++      long src
+ 
+ cdef extern void can_list_to_can_capnp_cpp(const vector[can_frame] &can_list, string &out, bool sendCan, bool valid)
+ 
+diff --git a/selfdrive/boardd/can_list_to_can_capnp.cc b/selfdrive/boardd/can_list_to_can_capnp.cc
+index faa0e3737..cc459e337 100644
+--- a/selfdrive/boardd/can_list_to_can_capnp.cc
++++ b/selfdrive/boardd/can_list_to_can_capnp.cc
+@@ -1,9 +1,7 @@
+ #include "cereal/messaging/messaging.h"
+ #include "panda.h"
+ 
+-extern "C" {
+-
+-void can_list_to_can_capnp_cpp(const std::vector<can_frame> &can_list, std::string &out, bool sendCan, bool valid) {
++void can_list_to_can_capnp_cpp(const std::vector<struct can_frame> &can_list, std::string &out, bool sendCan, bool valid) {
+   MessageBuilder msg;
+   auto event = msg.initEvent(valid);
+ 
+@@ -21,5 +19,3 @@ void can_list_to_can_capnp_cpp(const std::vector<can_frame> &can_list, std::stri
+   kj::ArrayOutputStream output_stream(kj::ArrayPtr<capnp::byte>((unsigned char *)out.data(), msg_size));
+   capnp::writeMessage(output_stream, msg);
+ }
+-
+-}
+diff --git a/selfdrive/modeld/runners/onnx_runner.py b/selfdrive/modeld/runners/onnx_runner.py
+index ac7cc6881..e2092c137 100755
+--- a/selfdrive/modeld/runners/onnx_runner.py
++++ b/selfdrive/modeld/runners/onnx_runner.py
+@@ -7,51 +7,70 @@ import numpy as np
+ os.environ["OMP_NUM_THREADS"] = "4"
+ os.environ["OMP_WAIT_POLICY"] = "PASSIVE"
+ 
+-import onnxruntime as ort # pylint: disable=import-error
++import onnxruntime as ort  # pylint: disable=import-error
++
+ 
+ def read(sz, tf8=False):
+-  dd = []
+-  gt = 0
+-  szof = 1 if tf8 else 4
+-  while gt < sz * szof:
+-    st = os.read(0, sz * szof - gt)
+-    assert(len(st) > 0)
+-    dd.append(st)
+-    gt += len(st)
+-  r = np.frombuffer(b''.join(dd), dtype=np.uint8 if tf8 else np.float32).astype(np.float32)
++  buf = b""
++  expected = sz * (1 if tf8 else 4)
++  while len(buf) < expected:
++    chunk = os.read(0, expected - len(buf))
++    if not chunk:
++      raise EOFError(f"Expected {expected} bytes, got {len(buf)} before EOF")
++    buf += chunk
++  r = np.frombuffer(buf, dtype=np.uint8 if tf8 else np.float32).astype(np.float32)
+   if tf8:
+     r = r / 255.
+   return r
+ 
++
+ def write(d):
+   os.write(1, d.tobytes())
+ 
++
+ def run_loop(m, tf8_input=False):
+-  ishapes = [[1]+ii.shape[1:] for ii in m.get_inputs()]
+-  keys = [x.name for x in m.get_inputs()]
++  inputs_meta = m.get_inputs()
++  ishapes = [[1] + i.shape[1:] for i in inputs_meta]
++  keys = [i.name for i in inputs_meta]
++  idtypes = []
+ 
+-  # run once to initialize CUDA provider
++  for i in inputs_meta:
++    if "uint8" in i.type:
++      idtypes.append(np.uint8)
++    elif "float" in i.type:
++      idtypes.append(np.float32)
++    else:
++      raise RuntimeError(f"Unsupported input type: {i.type}")
++
++  # warm-up pass for GPU
+   if "CUDAExecutionProvider" in m.get_providers():
+-    m.run(None, dict(zip(keys, [np.zeros(shp, dtype=np.float32) for shp in ishapes])))
++    m.run(None, {k: np.zeros(s, dtype=t) for k, s, t in zip(keys, ishapes, idtypes)})
+ 
+   print("ready to run onnx model", keys, ishapes, file=sys.stderr)
+-  while 1:
++
++  while True:
+     inputs = []
+-    for k, shp in zip(keys, ishapes):
++    for k, shp, dtype in zip(keys, ishapes, idtypes):
+       ts = np.product(shp)
+-      #print("reshaping %s with offset %d" % (str(shp), offset), file=sys.stderr)
+-      inputs.append(read(ts, (k=='input_img' and tf8_input)).reshape(shp))
++      if k == 'input_img' and tf8_input and dtype == np.float32:
++        raw = read(ts, tf8=True).reshape(shp)
++      else:
++        raw = read(ts, tf8=False).reshape(shp).astype(dtype)
++      inputs.append(raw)
++
+     ret = m.run(None, dict(zip(keys, inputs)))
+-    #print(ret, file=sys.stderr)
+     for r in ret:
++      print("output:", r.shape, file=sys.stderr)
+       write(r)
+ 
+ 
+ if __name__ == "__main__":
+   print(sys.argv, file=sys.stderr)
+   print("Onnx available providers: ", ort.get_available_providers(), file=sys.stderr)
++
+   options = ort.SessionOptions()
+   options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
++
+   if 'OpenVINOExecutionProvider' in ort.get_available_providers() and 'ONNXCPU' not in os.environ:
+     provider = 'OpenVINOExecutionProvider'
+   elif 'CUDAExecutionProvider' in ort.get_available_providers() and 'ONNXCPU' not in os.environ:
+@@ -71,3 +90,4 @@ if __name__ == "__main__":
+     run_loop(ort_session, tf8_input=("--use_tf8" in sys.argv))
+   except KeyboardInterrupt:
+     pass
++
