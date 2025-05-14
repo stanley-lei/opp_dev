@@ -133,16 +133,27 @@ scons -j$(nproc)
 ```
 
 ## Notes
+### Install LLVM 14
+
+```
+wget https://apt.llvm.org/llvm.sh
+chmod +x llvm.sh
+sudo ./llvm.sh 14
+sudo apt install libclang-14-dev
+
+```
 
 ### Solution to build substitue for pyopencl
 
 ```
+sudo copy libdevice.10.bc /usr/local/cuda/nvvm/libdevice/libdevice.10.bc
+
 cd ~/workspace
-git clone --single-branch --branch ${POCL_VERSION} https://github.com/pocl/pocl.git
+git clone --branch release_4_0 https://github.com/pocl/pocl.git
 cd ${WORKSPACE}/pocl
 mkdir build
 cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DWITH_LLVM_CONFIG=/usr/lib/${LLVM_INSTALL_FOLDER}/bin/llvm-config -DENABLE_CUDA=ON -DSTATIC_LLVM=ON ..
+CC=clang-16 CXX=clang++-16 cmake ..   -DCMAKE_BUILD_TYPE=Release   -DLLVM_CONFIG=/usr/bin/llvm-config-16   -DCMAKE_C_FLAGS="-mcpu=cortex-a78  -I/usr/lib/llvm-16/include"  -DCMAKE_CXX_FLAGS="-mcpu=cortex-a78  -I/usr/lib/llvm-16/include"  -DLLC_HOST_CPU=cortex-a78   -DENABLE_CUDA=ON   -DCUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda   -DC_LIBFILE_clang-cpp=/usr/lib/llvm-16/lib/libclang-cpp.so.16 -DOCL_ICD_INCLUDE_DIRS=/usr/include
 make -j $(nproc)
 sudo make install
 mkdir -p /etc/OpenCL/vendors/
