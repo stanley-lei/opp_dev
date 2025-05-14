@@ -46,20 +46,15 @@ sudo apt update
 sudo apt install binfmt-support qemu-user-static
 ```
 
-# Sync the code to local
+# Sync code to local
 
 ```
-git clone https://github.com/stanley-lei/opp_dev.git
-cd opp_dev
+#git clone --recursive https://github.com/eFiniLan/xnxpilot.git
 
-git clone --recursive https://github.com/eFiniLan/xnxpilot.git
+#git clone --recursive https://github.com/commaai/openpilot.git
 
-git clone --recursive https://github.com/commaai/openpilot.git
+git clone --branch orin_branch --recursive git@github.com:stanley-lei/openpilot_orin.git
 
-cd openpilot
-git checkout v0.8.16
-git submodule update --init --recurisive
-patch -p1 < ../SConstruct.patch
 ```
 
 # Setup Build Environment
@@ -90,7 +85,8 @@ scons -j$(nproc)
 ### Build Docker for openpilot (ARM64 Ubuntu Base)
 
 ```
-./build_orin_docker.sh
+./build_jetpack_docker.sh
+docker compose exec jetpack bash
 
 ```
 ### Build openpilot in Docker
@@ -99,12 +95,10 @@ This Docker already has preinstalled system dependencies installed which
 are defined in Dockerfile. So it only needs to install the dependent python packages.
 
 ```
-docker compose exec orin bash
-cd openpilot
 python -m venv venv
 pip install --upgrade pip setuptools wheel
 pip install ../onnxruntime_gpu-1.8.0-cp38-cp38-linux_aarch64.whl
-export PYTHONPATH=/home/nvidia/workspace/openpilot:$PYTHONPATH
+source launch_env.sh
 scons -j$(nproc)
 ```
 
@@ -117,22 +111,48 @@ scons -j$(nproc)
 ./launch_docker.sh
 
 ```
-### Build openpilot in Docker
 
-This Docker already has preinstalled system dependencies installed which
-are defined in Dockerfile. So it only needs to install the dependent python packages.
-
+### Reenter Docker Container
 ```
-docker compose exec orin bash
-cd openpilot
-python -m venv venv
-pip install --upgrade pip setuptools wheel
-pip install ../onnxruntime_gpu-1.8.0-cp38-cp38-linux_aarch64.whl
-export PYTHONPATH=/home/nvidia/workspace/openpilot:$PYTHONPATH
+./run_docker.sh
+```
+
+### Build openpilot inorin
+
+#### Install Dependencies
+```
+./install_dependencies_orin.sh
+```
+
+#### Cleanup Local Python Pre-Installed Packages
+```
+sudo rm -rf /usr/lib/python3.8/site-packages/*
+```
+
+#### Build Openpilit
+```
+sudo python3 -m venv venv
+sudo pip install -r requirements.txt
+
+cd openpilot_orin
+source launch_env.sh
 scons -j$(nproc)
+python selfdrive/manager/manager.py
+
 ```
 
-## Notes
+## Build POCL to enable opencl with CUDA backended (No Image Feature supported)
+### Upgrade CMake
+
+```
+cd ~
+wget https://github.com/Kitware/CMake/releases/download/v3.27.9/cmake-3.27.9-linux-aarch64.tar.gz
+tar -xzvf cmake-3.27.9-linux-aarch64.tar.gz
+export PATH=~/cmake-3.27.9-linux-aarch64/bin:$PATH
+which cmake
+cmake --version
+```
+
 ### Install LLVM 14
 
 ```
@@ -143,12 +163,11 @@ sudo apt install libclang-14-dev
 
 ```
 
-### Solution to build substitue for pyopencl
+### Build pyopencl
 
 ```
 sudo copy libdevice.10.bc /usr/local/cuda/nvvm/libdevice/libdevice.10.bc
 
-cd ~/workspace
 git clone --branch release_4_0 https://github.com/pocl/pocl.git
 cd ${WORKSPACE}/pocl
 mkdir build
